@@ -18,6 +18,17 @@ const ManagerDashboard = ({ user, onLogout }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [viewJob, setViewJob] = useState(null);
+  const [showCustomQuote, setShowCustomQuote] = useState(false);
+  const [customQuoteData, setCustomQuoteData] = useState({
+    vehicle_number: '',
+    customer_name: '',
+    telephone: '',
+    job_type: 'repair',
+    special_notes: '',
+    items: [],
+    labor_cost: 0
+  });
 
   useEffect(() => {
     if (activeTab === 'quotations') {
@@ -156,8 +167,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
     try {
       const response = await axios.get('/vehicles/search', {
         params: {
-          vehicle_number: searchQuery,
-          telephone: searchQuery
+          query: searchQuery
         }
       });
 
@@ -239,6 +249,87 @@ const ManagerDashboard = ({ user, onLogout }) => {
       return typeof images === 'string' ? JSON.parse(images) : images;
     } catch (e) {
       return [];
+    }
+  };
+
+  const handleViewJob = (job) => {
+    setViewJob(job);
+  };
+
+  const handleCreateCustomQuote = (vehicle) => {
+    setCustomQuoteData({
+      vehicle_number: vehicle.vehicle_number,
+      customer_name: vehicle.customer_name || '',
+      telephone: vehicle.telephone || '',
+      job_type: 'repair',
+      special_notes: '',
+      items: [{ description: '', amount: '' }],
+      labor_cost: 0
+    });
+    setShowCustomQuote(true);
+  };
+
+  const addCustomPriceRow = () => {
+    setCustomQuoteData({
+      ...customQuoteData,
+      items: [...customQuoteData.items, { description: '', amount: '' }]
+    });
+  };
+
+  const removeCustomPriceRow = (index) => {
+    const newItems = customQuoteData.items.filter((_, i) => i !== index);
+    setCustomQuoteData({ ...customQuoteData, items: newItems });
+  };
+
+  const handleCustomQuoteChange = (index, field, value) => {
+    const newItems = [...customQuoteData.items];
+    newItems[index][field] = value;
+    setCustomQuoteData({ ...customQuoteData, items: newItems });
+  };
+
+  const submitCustomQuote = async () => {
+    try {
+      if (!customQuoteData.vehicle_number || !customQuoteData.items.some(i => i.description && i.amount)) {
+        toast.error('Please fill in vehicle number and at least one item');
+        return;
+      }
+
+      const itemsToSend = customQuoteData.items
+        .filter(i => i.description && i.amount)
+        .map(i => ({ description: i.description, amount: parseFloat(i.amount) }));
+
+      await axios.post('/quotations/custom', {
+        ...customQuoteData,
+        items: itemsToSend,
+        labor_cost: parseFloat(customQuoteData.labor_cost)
+      });
+
+      toast.success('Custom quotation created successfully');
+      setShowCustomQuote(false);
+      // Refresh search results if searching
+      if (searchQuery) handleSearch();
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to create custom quotation');
+    }
+  };
+
+  const handleDownloadJobPDF = async (quotationId, quotationNumber) => {
+    try {
+      const response = await axios.post(`/quotations/${quotationId}/generate-pdf`, {}, {
+        responseType: 'blob'
+      });
+      // Create blob and download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `quotation-${quotationNumber}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Job record downloaded successfully!');
+    } catch (error) {
+      toast.error('Failed to download job record');
     }
   };
 
@@ -524,7 +615,15 @@ const ManagerDashboard = ({ user, onLogout }) => {
           </div>
           {searchResults && (
             <div style={{ marginTop: '2rem' }}>
-              <h3 style={{ marginBottom: '1rem' }}>Vehicle History</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ marginBottom: 0 }}>Vehicle History</h3>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleCreateCustomQuote(searchResults.vehicle)}
+                >
+                  <FiPlus /> Create Custom Quotation
+                </button>
+              </div>
               <div className="glass-card" style={{ marginBottom: '1rem' }}>
                 <p><strong>Vehicle Number:</strong> {searchResults.vehicle.vehicle_number}</p>
                 {searchResults.vehicle.customer_name && (
@@ -540,15 +639,37 @@ const ManagerDashboard = ({ user, onLogout }) => {
                 <>
                   {searchResults.jobs.map((job) => (
                     <div key={job.id} className="glass-card" style={{ marginTop: '1rem' }}>
-                      <p><strong>Job #{job.job_number}</strong></p>
-                      <p>Type: {job.job_type.replace('_', ' ').toUpperCase()}</p>
-                      <p>Date: {new Date(job.created_at).toLocaleDateString()}</p>
-                      {job.quotation_number && (
-                        <>
-                          <p>Quotation: {job.quotation_number}</p>
-                          <p>Total: Rs. {parseFloat(job.total_amount || 0).toFixed(2)}</p>
-                        </>
-                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <p><strong>Job #{job.job_number}</strong></p>
+                          <p>Type: {job.job_type.replace('_', ' ').toUpperCase()}</p>
+                          <p>Date: {new Date(job.created_at).toLocaleDateString()}</p>
+                          {job.quotation_number && (
+                            <>
+                              <p>Quotation: {job.quotation_number}</p>
+                              <p>Total: Rs. {parseFloat(job.total_amount || 0).toFixed(2)}</p>
+                            </>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => handleViewJob(job)}
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem', width: '100%' }}
+                          >
+                            View Details
+                          </button>
+                          {job.quotation_id && (
+                            <button
+                              className="btn btn-success"
+                              onClick={() => handleDownloadJobPDF(job.quotation_id, job.quotation_number)}
+                              style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem', width: '100%' }}
+                            >
+                              <FiDownload /> Record
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                   <button
@@ -564,6 +685,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
           )}
         </div>
       )}
+
       {showImageModal && selectedImage && (
         <div className="modal-overlay" onClick={() => setShowImageModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -601,6 +723,193 @@ const ManagerDashboard = ({ user, onLogout }) => {
                   cursor: zoomLevel > 1 ? 'grab' : 'default'
                 }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewJob && (
+        <div className="modal-overlay" onClick={() => setViewJob(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Job Details #{viewJob.job_number}</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', marginRight: '1rem', marginLeft: 'auto' }}>
+                {viewJob.quotation_id && (
+                  <button
+                    className="btn btn-success"
+                    onClick={() => handleDownloadJobPDF(viewJob.quotation_id, viewJob.quotation_number)}
+                  >
+                    <FiDownload /> Download Record
+                  </button>
+                )}
+              </div>
+              <button className="modal-close" onClick={() => setViewJob(null)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="form-group">
+              <p><strong>Status:</strong> {viewJob.status.toUpperCase()}</p>
+              <p><strong>Type:</strong> {viewJob.job_type.replace('_', ' ').toUpperCase()}</p>
+              <p><strong>Employee:</strong> {viewJob.employee_name || 'N/A'}</p>
+              <p><strong>Notes:</strong> {viewJob.special_notes || 'None'}</p>
+            </div>
+
+            <div className="job-details-section">
+              {parseImages(viewJob.initial_images).length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3>Initial Images</h3>
+                  <div className="image-gallery">
+                    {parseImages(viewJob.initial_images).map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="image-gallery-item"
+                        onClick={() => openImageModal(img, `Initial Image ${idx + 1}`)}
+                      >
+                        <img src={`http://localhost:5001${img}`} alt={`Initial ${idx + 1}`} />
+                        <div className="image-gallery-label">Initial {idx + 1}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {parseImages(viewJob.after_images).length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                  <h3>After Service Images</h3>
+                  <div className="image-gallery">
+                    {parseImages(viewJob.after_images).map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="image-gallery-item"
+                        onClick={() => openImageModal(img, `After Image ${idx + 1}`)}
+                      >
+                        <img src={`http://localhost:5001${img}`} alt={`After ${idx + 1}`} />
+                        <div className="image-gallery-label">After {idx + 1}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomQuote && (
+        <div className="modal-overlay" onClick={() => setShowCustomQuote(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Create Custom Quotation</h3>
+              <button className="modal-close" onClick={() => setShowCustomQuote(false)}>
+                <FiX />
+              </button>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Vehicle Number</label>
+              <input type="text" className="form-input" value={customQuoteData.vehicle_number} disabled />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Customer Name</label>
+              <input
+                type="text"
+                className="form-input"
+                value={customQuoteData.customer_name}
+                onChange={(e) => setCustomQuoteData({ ...customQuoteData, customer_name: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Telephone</label>
+              <input
+                type="text"
+                className="form-input"
+                value={customQuoteData.telephone}
+                onChange={(e) => setCustomQuoteData({ ...customQuoteData, telephone: e.target.value })}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Job Type</label>
+              <select
+                className="form-select"
+                value={customQuoteData.job_type}
+                onChange={(e) => setCustomQuoteData({ ...customQuoteData, job_type: e.target.value })}
+              >
+                <option value="repair">Repair</option>
+                <option value="service">Service</option>
+                <option value="accident_recovery">Accident Recovery</option>
+                <option value="wiring">Wiring</option>
+                <option value="hybrid_service">Hybrid Service</option>
+                <option value="detailing">Detailing</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Special Notes</label>
+              <textarea
+                className="form-input"
+                value={customQuoteData.special_notes}
+                onChange={(e) => setCustomQuoteData({ ...customQuoteData, special_notes: e.target.value })}
+              />
+            </div>
+
+            <div className="job-details-section">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3>Items & Pricing</h3>
+                <button
+                  className="btn btn-secondary"
+                  onClick={addCustomPriceRow}
+                  style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                >
+                  <FiPlus /> Add Item
+                </button>
+              </div>
+
+              {customQuoteData.items.map((item, index) => (
+                <div key={index} className="price-input-group">
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={item.description}
+                    onChange={(e) => handleCustomQuoteChange(index, 'description', e.target.value)}
+                    placeholder="Description"
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={item.amount}
+                      onChange={(e) => handleCustomQuoteChange(index, 'amount', e.target.value)}
+                      placeholder="Price"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => removeCustomPriceRow(index)}
+                      style={{ padding: '12px', minWidth: 'auto' }}
+                    >
+                      <FiX />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Labor Cost</label>
+              <input
+                type="number"
+                className="form-input"
+                value={customQuoteData.labor_cost}
+                onChange={(e) => setCustomQuoteData({ ...customQuoteData, labor_cost: e.target.value })}
+              />
+            </div>
+
+            <div className="card-actions" style={{ marginTop: '2rem' }}>
+              <button className="btn btn-secondary" onClick={() => setShowCustomQuote(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={submitCustomQuote}>Create Quotation</button>
             </div>
           </div>
         </div>

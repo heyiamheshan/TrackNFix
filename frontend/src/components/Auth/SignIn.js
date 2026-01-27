@@ -69,7 +69,7 @@ const SignIn = ({ onLogin }) => {
               onChange={handleChange}
               required
             />
-            <p className="auth-link" style={{ textAlign: 'right', marginTop: '0.5rem' }}>
+            <p className="auth-forgot-password">
               <a href="/forgot-password">Forgot Password?</a>
             </p>
           </div>

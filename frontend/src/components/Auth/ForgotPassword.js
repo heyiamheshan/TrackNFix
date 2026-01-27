@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { FiMail, FiLock, FiKey, FiArrowRight } from 'react-icons/fi';
 import './Auth.css'; // Assuming your Auth.css has general styles
 
+import vehicleImage from '../../assets/vehicle.png'; // Import vehicle image
 import logo from '../../assets/logo.png'; // Import the logo
 
 const ForgotPassword = () => {
@@ -19,7 +20,7 @@ const ForgotPassword = () => {
     setLoading(true);
     try {
       const response = await axios.post('/auth/forgot-password', { email });
-      
+
       // Check if OTP is in response (development mode)
       if (response.data.devOtp) {
         toast.warning(`Development Mode: OTP is ${response.data.devOtp}. Check server console for details.`, {
@@ -28,12 +29,12 @@ const ForgotPassword = () => {
       } else {
         toast.success('OTP sent to your email if the account exists.');
       }
-      
+
       setStep(2);
     } catch (error) {
       const errorMessage = error.response?.data?.message || 'Failed to send OTP.';
       toast.error(errorMessage);
-      
+
       // If there's a devOtp in error response, show it
       if (error.response?.data?.devOtp) {
         toast.info(`Development OTP: ${error.response.data.devOtp}`, {
@@ -127,7 +128,7 @@ const ForgotPassword = () => {
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? 'Verifying...' : (<><FiKey /> Verify OTP</>)}
             </button>
-            <p className="auth-link" style={{marginTop: '1rem'}}>
+            <p className="auth-link" style={{ marginTop: '1rem' }}>
               Didn't receive OTP? <a href="#" onClick={handleForgotPassword}>Resend OTP</a>
             </p>
           </form>
@@ -176,8 +177,8 @@ const ForgotPassword = () => {
           <p className="auth-subtitle">Forgot Password</p>
         </div>
         {renderStep()}
-        <p className="auth-link" style={{marginTop: '2rem'}}>
-            Remember your password? <a href="/signin">Sign In</a>
+        <p className="auth-link" style={{ marginTop: '2rem' }}>
+          Remember your password? <a href="/signin">Sign In</a>
         </p>
       </div>
     </div>

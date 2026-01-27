@@ -9,22 +9,28 @@ const router = express.Router();
 // @access  Private
 router.get('/search', protect, async (req, res) => {
   try {
-    const { vehicle_number, telephone } = req.query;
+    const { vehicle_number, telephone, query: searchQuery } = req.query;
 
-    let query = 'SELECT * FROM vehicles WHERE 1=1';
+    let sqlQuery = 'SELECT * FROM vehicles WHERE 1=1';
     const params = [];
 
-    if (vehicle_number) {
-      query += ' AND vehicle_number LIKE ?';
-      params.push(`%${vehicle_number}%`);
+    if (searchQuery) {
+      sqlQuery += ' AND (vehicle_number LIKE ? OR telephone LIKE ? OR customer_name LIKE ?)';
+      const likeParam = `%${searchQuery}%`;
+      params.push(likeParam, likeParam, likeParam);
+    } else {
+      if (vehicle_number) {
+        sqlQuery += ' AND vehicle_number LIKE ?';
+        params.push(`%${vehicle_number}%`);
+      }
+
+      if (telephone) {
+        sqlQuery += ' AND telephone LIKE ?';
+        params.push(`%${telephone}%`);
+      }
     }
 
-    if (telephone) {
-      query += ' AND telephone LIKE ?';
-      params.push(`%${telephone}%`);
-    }
-
-    const [vehicles] = await pool.execute(query, params);
+    const [vehicles] = await pool.execute(sqlQuery, params);
 
     res.json({ vehicles });
   } catch (error) {
@@ -72,7 +78,7 @@ router.get('/:vehicleNumber/history', protect, async (req, res) => {
 
     // Get all jobs for this vehicle
     const [jobs] = await pool.execute(
-      `SELECT j.*, u.name as employee_name, q.quotation_number, q.total_amount, q.status as quotation_status
+      `SELECT j.*, u.name as employee_name, q.id as quotation_id, q.quotation_number, q.total_amount, q.status as quotation_status
        FROM jobs j
        LEFT JOIN users u ON j.employee_id = u.id
        LEFT JOIN quotations q ON j.id = q.job_id
@@ -139,7 +145,7 @@ router.post('/', protect, async (req, res) => {
       const [result] = await pool.execute(
         `INSERT INTO vehicles (vehicle_number, customer_name, address, telephone, vehicle_type, color, insurance_company)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [vehicle_number, customer_name || null, address || null, telephone || null, vehicle_type || null, color || null, insurance_company || null]
+        [vehicle_number, customer_name || null, address || null, telephone || null, vehicle_type || null, color || null, insurance_company || null]
       );
 
       const [newVehicle] = await pool.execute(
@@ -161,7 +167,7 @@ router.post('/', protect, async (req, res) => {
 router.post('/:vehicleNumber/service-record-pdf', protect, async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
-    
+
     const [vehicles] = await pool.execute(
       'SELECT * FROM vehicles WHERE vehicle_number = ?',
       [req.params.vehicleNumber]
@@ -186,11 +192,11 @@ router.post('/:vehicleNumber/service-record-pdf', protect, async (req, res) => {
 
     // Create PDF
     const doc = new PDFDocument({ margin: 50 });
-    
+
     // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=service-record-${vehicle.vehicle_number}.pdf`);
-    
+
     doc.pipe(res);
 
     // PDF Content
@@ -218,16 +224,17 @@ router.post('/:vehicleNumber/service-record-pdf', protect, async (req, res) => {
         doc.fontSize(12);
         doc.text(`Job Number: ${job.job_number}`);
         doc.text(`Date: ${new Date(job.created_at).toLocaleDateString()}`);
-        doc.text(`Job Type: ${job.job_type.replace('_', ' ').toUpperCase()}`);
+        const jobType = job.job_type ? job.job_type.replace('_', ' ').toUpperCase() : 'N/A';
+        doc.text(`Job Type: ${jobType}`);
         doc.text(`Employee: ${job.employee_name || 'N/A'}`);
-        
+
         if (job.special_notes) {
           doc.text(`Notes: ${job.special_notes}`);
         }
 
         if (job.quotation_number) {
           doc.text(`Quotation: ${job.quotation_number}`);
-          
+
           let prices = [];
           try {
             prices = job.prices ? (typeof job.prices === 'string' ? JSON.parse(job.prices) : job.prices) : [];
@@ -243,11 +250,11 @@ router.post('/:vehicleNumber/service-record-pdf', protect, async (req, res) => {
           }
 
           if (job.labor_cost) {
-            doc.text(`Labor Cost: Rs. ${parseFloat(job.labor_cost).toFixed(2)}`);
+            doc.text(`Labor Cost: Rs. ${parseFloat(job.labor_cost || 0).toFixed(2)}`);
           }
 
           if (job.total_amount) {
-            doc.text(`Total: Rs. ${parseFloat(job.total_amount).toFixed(2)}`, { bold: true });
+            doc.text(`Total: Rs. ${parseFloat(job.total_amount || 0).toFixed(2)}`, { bold: true });
           }
         }
 
