@@ -4,6 +4,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import './Auth.css';
 
+import vehicleImage from '../../assets/vehicle.png'; // Import vehicle image
 import logo from '../../assets/logo.png'; // Import the logo
 
 const SignUp = ({ onLogin }) => {
