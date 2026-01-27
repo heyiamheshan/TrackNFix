@@ -361,7 +361,8 @@ router.post('/:id/generate-pdf', protect, authorize('manager'), async (req, res)
 
     doc.fontSize(16).text('Job Details', { underline: true });
     doc.fontSize(12);
-    doc.text(`Job Type: ${quotation.job_type.replace('_', ' ').toUpperCase()}`);
+    const jobType = quotation.job_type ? quotation.job_type.replace('_', ' ').toUpperCase() : 'N/A';
+    doc.text(`Job Type: ${jobType}`);
     if (quotation.special_notes) {
       doc.text(`Special Notes: ${quotation.special_notes}`);
     }
@@ -402,7 +403,7 @@ router.post('/:id/generate-pdf', protect, authorize('manager'), async (req, res)
     }
 
     if (quotation.labor_cost) {
-      doc.text(`Labor Cost: Rs. ${parseFloat(quotation.labor_cost).toFixed(2)}`);
+      doc.text(`Labor Cost: Rs. ${parseFloat(quotation.labor_cost || 0).toFixed(2)}`);
     }
 
     doc.moveDown();
@@ -451,6 +452,99 @@ router.post('/:id/approve', protect, authorize('manager'), async (req, res) => {
     res.json({ message: 'Quotation approved and notification sent to admin' });
   } catch (error) {
     console.error('Approve quotation error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   POST /api/quotations/custom
+// @desc    Create custom quotation for existing vehicle (manager)
+// @access  Private (Manager)
+router.post('/custom', protect, authorize('manager'), async (req, res) => {
+  try {
+    const { vehicle_number, customer_name, telephone, job_type, special_notes, items, labor_cost } = req.body;
+
+    if (!vehicle_number) {
+      return res.status(400).json({ message: 'Vehicle number is required' });
+    }
+
+    // 1. Get or create vehicle
+    let [vehicles] = await pool.execute(
+      'SELECT * FROM vehicles WHERE vehicle_number = ?',
+      [vehicle_number]
+    );
+
+    let vehicleId;
+    let vehicle = vehicles[0];
+
+    if (vehicles.length === 0) {
+      // Create new vehicle (if not exists, though usually search suggests it exists)
+      const [vehicleResult] = await pool.execute(
+        `INSERT INTO vehicles (vehicle_number, customer_name, telephone)
+         VALUES (?, ?, ?)`,
+        [vehicle_number, customer_name || null, telephone || null]
+      );
+      vehicleId = vehicleResult.insertId;
+    } else {
+      vehicleId = vehicles[0].id;
+      // Update vehicle contact info if provided
+      if (customer_name || telephone) {
+        await pool.execute(
+          `UPDATE vehicles SET customer_name = COALESCE(?, customer_name), 
+           telephone = COALESCE(?, telephone)
+           WHERE id = ?`,
+          [customer_name, telephone, vehicleId]
+        );
+      }
+    }
+
+    // 2. Create a "Custom" Job
+    // Since this didn't come from an employee, we'll assign the manager as the employee for tracking or null
+    // We'll set status to 'reviewed' as it's being quoted immediately
+    const [jobResult] = await pool.execute(
+      `INSERT INTO jobs (vehicle_id, employee_id, job_type, special_notes, status)
+       VALUES (?, ?, ?, ?, 'reviewed')`,
+      [vehicleId, req.user.id, job_type || 'other', special_notes || 'Custom Quotation']
+    );
+    const jobId = jobResult.insertId;
+
+    // 3. Generate quotation number
+    const [counterResult] = await pool.execute(
+      'UPDATE quotation_counter SET last_quotation_number = last_quotation_number + 1'
+    );
+    const [counter] = await pool.execute('SELECT last_quotation_number FROM quotation_counter LIMIT 1');
+    const quotationNumber = `QUO-${String(counter[0].last_quotation_number).padStart(6, '0')}`;
+
+    // 4. Create Quotation
+    const totalAmount = (items || []).reduce((acc, item) => acc + (parseFloat(item.amount) || 0), 0) + (parseFloat(labor_cost) || 0);
+    const jobsDone = (items || []).map(item => item.description);
+
+    const [quotationResult] = await pool.execute(
+      `INSERT INTO quotations (quotation_number, job_id, vehicle_id, manager_id, vehicle_number, customer_name, 
+       telephone, job_type, jobs_done, prices, labor_cost, total_amount, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+      [
+        quotationNumber,
+        jobId,
+        vehicleId,
+        req.user.id,
+        vehicle_number,
+        customer_name || (vehicle ? vehicle.customer_name : null),
+        telephone || (vehicle ? vehicle.telephone : null),
+        job_type || 'other',
+        JSON.stringify(jobsDone),
+        JSON.stringify(items || []),
+        parseFloat(labor_cost) || 0,
+        totalAmount,
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Custom quotation created successfully',
+      quotationId: quotationResult.insertId
+    });
+
+  } catch (error) {
+    console.error('Create custom quotation error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

@@ -198,8 +198,7 @@ const AdminDashboard = ({ user, onLogout }) => {
     try {
       const response = await axios.get('/vehicles/search', {
         params: {
-          vehicle_number: searchQuery,
-          telephone: searchQuery
+          query: searchQuery
         }
       });
 
