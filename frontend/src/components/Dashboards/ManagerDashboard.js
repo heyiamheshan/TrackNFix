@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { FiEdit, FiDownload, FiSend, FiSearch, FiPlus, FiX } from 'react-icons/fi';
+import { FiEdit, FiDownload, FiSend, FiSearch, FiPlus, FiX, FiZoomIn, FiZoomOut, FiRefreshCw } from 'react-icons/fi';
 import './Dashboard.css';
 
 import logo from '../../assets/logo.png'; // Import the logo
@@ -15,6 +15,9 @@ const ManagerDashboard = ({ user, onLogout }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   useEffect(() => {
     if (activeTab === 'quotations') {
@@ -40,7 +43,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
   const handleEditQuotation = (quotation) => {
     setSelectedQuotation(quotation);
     let jobsDone = [];
-    
+
     try {
       jobsDone = quotation.jobs_done ? (typeof quotation.jobs_done === 'string' ? JSON.parse(quotation.jobs_done) : quotation.jobs_done) : [];
     } catch (e) {
@@ -68,7 +71,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
         amount: price.amount || ''
       })));
     }
-    
+
     setLaborCost(quotation.labor_cost || 0);
   };
 
@@ -90,9 +93,9 @@ const ManagerDashboard = ({ user, onLogout }) => {
     try {
       const pricesToSend = prices
         .filter(p => p.description.trim() && p.amount)
-        .map(p => ({ 
-          description: p.description.trim(), 
-          amount: parseFloat(p.amount) || 0 
+        .map(p => ({
+          description: p.description.trim(),
+          amount: parseFloat(p.amount) || 0
         }));
 
       await axios.put(`/quotations/${selectedQuotation.id}`, {
@@ -102,7 +105,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
         telephone: selectedQuotation.telephone || null,
         insurance_company: selectedQuotation.insurance_company || null
       });
-      
+
       toast.success('Quotation updated successfully!');
       setSelectedQuotation(null);
       fetchQuotations();
@@ -116,7 +119,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
       const response = await axios.post(`/quotations/${selectedQuotation.id}/generate-pdf`, {}, {
         responseType: 'blob'
       });
-      
+
       // Create blob and download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -125,7 +128,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
       toast.success('PDF generated and downloaded successfully!');
     } catch (error) {
       toast.error('Failed to generate PDF');
@@ -157,7 +160,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
           telephone: searchQuery
         }
       });
-      
+
       if (response.data.vehicles.length > 0) {
         const vehicle = response.data.vehicles[0];
         const historyResponse = await axios.get(`/vehicles/${vehicle.vehicle_number}/history`);
@@ -176,7 +179,7 @@ const ManagerDashboard = ({ user, onLogout }) => {
       const response = await axios.post(`/vehicles/${vehicleNumber}/service-record-pdf`, {}, {
         responseType: 'blob'
       });
-      
+
       // Create blob and download
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -185,10 +188,57 @@ const ManagerDashboard = ({ user, onLogout }) => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      
+
       toast.success('Service record downloaded successfully!');
     } catch (error) {
       toast.error('Failed to download service record');
+    }
+  };
+
+  const openImageModal = (imageUrl, label) => {
+    setSelectedImage({ url: imageUrl, label });
+    setZoomLevel(1);
+    setShowImageModal(true);
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.5, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1);
+  };
+
+  const handleDownloadImage = async () => {
+    try {
+      const response = await fetch(`http://localhost:5001${selectedImage.url}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // Extract filename from path or use label
+      const filename = selectedImage.url.split('/').pop() || 'image.jpg';
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Failed to download image');
+    }
+  };
+
+  const parseImages = (images) => {
+    if (!images) return [];
+    try {
+      return typeof images === 'string' ? JSON.parse(images) : images;
+    } catch (e) {
+      return [];
     }
   };
 
@@ -320,6 +370,44 @@ const ManagerDashboard = ({ user, onLogout }) => {
                   />
                 </div>
               )}
+
+              <div className="job-details-section">
+                {parseImages(selectedQuotation.initial_images).length > 0 && (
+                  <div style={{ marginBottom: '2rem' }}>
+                    <h3>Initial Images</h3>
+                    <div className="image-gallery">
+                      {parseImages(selectedQuotation.initial_images).map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="image-gallery-item"
+                          onClick={() => openImageModal(img, `Initial Image ${idx + 1}`)}
+                        >
+                          <img src={`http://localhost:5001${img}`} alt={`Initial ${idx + 1}`} />
+                          <div className="image-gallery-label">Initial {idx + 1}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {parseImages(selectedQuotation.after_images).length > 0 && (
+                  <div style={{ marginBottom: '2rem' }}>
+                    <h3>After Service Images</h3>
+                    <div className="image-gallery">
+                      {parseImages(selectedQuotation.after_images).map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="image-gallery-item"
+                          onClick={() => openImageModal(img, `After Image ${idx + 1}`)}
+                        >
+                          <img src={`http://localhost:5001${img}`} alt={`After ${idx + 1}`} />
+                          <div className="image-gallery-label">After {idx + 1}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="job-details-section">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -474,6 +562,47 @@ const ManagerDashboard = ({ user, onLogout }) => {
               )}
             </div>
           )}
+        </div>
+      )}
+      {showImageModal && selectedImage && (
+        <div className="modal-overlay" onClick={() => setShowImageModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">{selectedImage.label}</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', marginRight: '1rem', marginLeft: 'auto' }}>
+                <button className="btn btn-secondary" onClick={handleZoomOut} title="Zoom Out">
+                  <FiZoomOut />
+                </button>
+                <button className="btn btn-secondary" onClick={handleResetZoom} title="Reset Zoom">
+                  <FiRefreshCw />
+                </button>
+                <button className="btn btn-secondary" onClick={handleZoomIn} title="Zoom In">
+                  <FiZoomIn />
+                </button>
+                <button className="btn btn-primary" onClick={handleDownloadImage} title="Download">
+                  <FiDownload />
+                </button>
+              </div>
+              <button className="modal-close" onClick={() => setShowImageModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div style={{ overflow: 'auto', maxHeight: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+              <img
+                src={`http://localhost:5001${selectedImage.url}`}
+                alt={selectedImage.label}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '12px',
+                  transform: `scale(${zoomLevel})`,
+                  transition: 'transform 0.2s ease-in-out',
+                  cursor: zoomLevel > 1 ? 'grab' : 'default'
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
