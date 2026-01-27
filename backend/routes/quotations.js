@@ -277,10 +277,31 @@ router.put('/:id', protect, async (req, res) => {
 // @access  Private (Admin)
 router.put('/:id/send-to-manager', protect, authorize('admin'), async (req, res) => {
   try {
+    // Get quotation details to find job_id
+    const [quotations] = await pool.execute(
+      'SELECT job_id FROM quotations WHERE id = ?',
+      [req.params.id]
+    );
+
+    if (quotations.length === 0) {
+      return res.status(404).json({ message: 'Quotation not found' });
+    }
+
+    const jobId = quotations[0].job_id;
+
+    // Update quotation status
     await pool.execute(
       "UPDATE quotations SET status = 'sent_to_manager' WHERE id = ?",
       [req.params.id]
     );
+
+    // Update job status to 'done'
+    if (jobId) {
+      await pool.execute(
+        "UPDATE jobs SET status = 'done' WHERE id = ?",
+        [jobId]
+      );
+    }
 
     res.json({ message: 'Quotation sent to manager successfully' });
   } catch (error) {
@@ -311,18 +332,18 @@ router.post('/:id/generate-pdf', protect, authorize('manager'), async (req, res)
 
     // Create PDF
     const doc = new PDFDocument({ margin: 50 });
-    
+
     // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=quotation-${quotation.quotation_number}.pdf`);
-    
+
     doc.pipe(res);
 
     // PDF Content
     doc.fontSize(24).text('JAYAKODY AUTO ELECTRICAL', { align: 'center' });
     doc.fontSize(20).text('QUOTATION', { align: 'center' });
     doc.moveDown();
-    
+
     doc.fontSize(12);
     doc.text(`Quotation Number: ${quotation.quotation_number}`, { align: 'left' });
     doc.text(`Date: ${new Date(quotation.created_at).toLocaleDateString()}`, { align: 'left' });

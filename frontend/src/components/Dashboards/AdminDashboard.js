@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { FiEye, FiSend, FiEdit, FiSearch, FiBell, FiX, FiArrowLeft } from 'react-icons/fi';
+import { FiEye, FiSend, FiEdit, FiSearch, FiBell, FiX, FiArrowLeft, FiDownload, FiZoomIn, FiZoomOut, FiRefreshCw } from 'react-icons/fi';
 import './Dashboard.css';
 
 import logo from '../../assets/logo.png'; // Import the logo
@@ -27,6 +27,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   useEffect(() => {
     if (activeTab === 'requests') {
@@ -80,7 +81,7 @@ const AdminDashboard = ({ user, onLogout }) => {
       const response = await axios.get(`/jobs/${jobId}`);
       const job = response.data.job;
       setSelectedJob(job);
-      
+
       // Parse images
       if (job.initial_images) {
         try {
@@ -96,7 +97,7 @@ const AdminDashboard = ({ user, onLogout }) => {
           job.after_images = [];
         }
       }
-      
+
       setSelectedJob(job);
     } catch (error) {
       toast.error('Failed to fetch job details');
@@ -105,7 +106,7 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const handleProceedToQuotation = () => {
     if (!selectedJob) return;
-    
+
     // Pre-fill quotation data from job
     setQuotationData({
       vehicle_number: selectedJob.vehicle_number || '',
@@ -155,7 +156,7 @@ const AdminDashboard = ({ user, onLogout }) => {
 
     try {
       const jobsDoneArray = quotationData.jobs_done.split('\n').filter(j => j.trim());
-      
+
       await axios.post('/quotations', {
         job_id: selectedJob.id,
         vehicle_number: quotationData.vehicle_number,
@@ -166,7 +167,7 @@ const AdminDashboard = ({ user, onLogout }) => {
         jobs_done: jobsDoneArray,
         insurance_company: quotationData.insurance_company || null
       });
-      
+
       toast.success('Quotation created successfully!');
       setShowQuotationForm(false);
       setSelectedJob(null);
@@ -201,7 +202,7 @@ const AdminDashboard = ({ user, onLogout }) => {
           telephone: searchQuery
         }
       });
-      
+
       if (response.data.vehicles.length > 0) {
         const vehicle = response.data.vehicles[0];
         const historyResponse = await axios.get(`/vehicles/${vehicle.vehicle_number}/history`);
@@ -218,7 +219,7 @@ const AdminDashboard = ({ user, onLogout }) => {
   const handleSendToCustomer = async (notification) => {
     const defaultMessage = `Vehicle ${notification.vehicle_number} is ready for pickup.`;
     const customMessage = prompt('Enter custom message:', defaultMessage);
-    
+
     if (customMessage) {
       try {
         await axios.post('/notifications/send-to-customer', {
@@ -236,7 +237,40 @@ const AdminDashboard = ({ user, onLogout }) => {
 
   const openImageModal = (imageUrl, label) => {
     setSelectedImage({ url: imageUrl, label });
+    setZoomLevel(1);
     setShowImageModal(true);
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.5, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1);
+  };
+
+  const handleDownloadImage = async () => {
+    try {
+      const response = await fetch(`http://localhost:5001${selectedImage.url}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // Extract filename from path or use label
+      const filename = selectedImage.url.split('/').pop() || 'image.jpg';
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Failed to download image');
+    }
   };
 
   const parseImages = (images) => {
@@ -333,7 +367,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                   <FiX /> Close
                 </button>
               </div>
-              
+
               <div className="job-details-section">
                 <p><strong>Job Number:</strong> {selectedJob.job_number}</p>
                 <p><strong>Job Type:</strong> {selectedJob.job_type.replace('_', ' ').toUpperCase()}</p>
@@ -356,7 +390,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                         className="image-gallery-item"
                         onClick={() => openImageModal(img, `Initial Image ${idx + 1}`)}
                       >
-                        <img src={`http://localhost:5000${img}`} alt={`Initial ${idx + 1}`} />
+                        <img src={`http://localhost:5001${img}`} alt={`Initial ${idx + 1}`} />
                         <div className="image-gallery-label">Initial {idx + 1}</div>
                       </div>
                     ))}
@@ -374,7 +408,7 @@ const AdminDashboard = ({ user, onLogout }) => {
                         className="image-gallery-item"
                         onClick={() => openImageModal(img, `After Image ${idx + 1}`)}
                       >
-                        <img src={`http://localhost:5000${img}`} alt={`After ${idx + 1}`} />
+                        <img src={`http://localhost:5001${img}`} alt={`After ${idx + 1}`} />
                         <div className="image-gallery-label">After {idx + 1}</div>
                       </div>
                     ))}
@@ -608,20 +642,39 @@ const AdminDashboard = ({ user, onLogout }) => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">{selectedImage.label}</h3>
+              <div style={{ display: 'flex', gap: '0.5rem', marginRight: '1rem', marginLeft: 'auto' }}>
+                <button className="btn btn-secondary" onClick={handleZoomOut} title="Zoom Out">
+                  <FiZoomOut />
+                </button>
+                <button className="btn btn-secondary" onClick={handleResetZoom} title="Reset Zoom">
+                  <FiRefreshCw />
+                </button>
+                <button className="btn btn-secondary" onClick={handleZoomIn} title="Zoom In">
+                  <FiZoomIn />
+                </button>
+                <button className="btn btn-primary" onClick={handleDownloadImage} title="Download">
+                  <FiDownload />
+                </button>
+              </div>
               <button className="modal-close" onClick={() => setShowImageModal(false)}>
                 <FiX />
               </button>
             </div>
-            <img
-              src={`http://localhost:5000${selectedImage.url}`}
-              alt={selectedImage.label}
-              style={{
-                width: '100%',
-                maxHeight: '70vh',
-                objectFit: 'contain',
-                borderRadius: '12px'
-              }}
-            />
+            <div style={{ overflow: 'auto', maxHeight: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem' }}>
+              <img
+                src={`http://localhost:5001${selectedImage.url}`}
+                alt={selectedImage.label}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '12px',
+                  transform: `scale(${zoomLevel})`,
+                  transition: 'transform 0.2s ease-in-out',
+                  cursor: zoomLevel > 1 ? 'grab' : 'default'
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
