@@ -643,6 +643,11 @@ const ManagerDashboard = ({ user, onLogout }) => {
                         <div>
                           <p><strong>Job #{job.job_number}</strong></p>
                           <p>Type: {job.job_type.replace('_', ' ').toUpperCase()}</p>
+                          {job.job_type === 'repair' && job.repair_type && (
+                            <p>Category: {job.repair_type.replace('_', ' ').toUpperCase()}
+                              {job.repair_subtype && ` (${job.repair_subtype.replace('_', ' ').toUpperCase()})`}
+                            </p>
+                          )}
                           <p>Date: {new Date(job.created_at).toLocaleDateString()}</p>
                           {job.quotation_number && (
                             <>
@@ -750,6 +755,11 @@ const ManagerDashboard = ({ user, onLogout }) => {
             <div className="form-group">
               <p><strong>Status:</strong> {viewJob.status.toUpperCase()}</p>
               <p><strong>Type:</strong> {viewJob.job_type.replace('_', ' ').toUpperCase()}</p>
+              {viewJob.job_type === 'repair' && viewJob.repair_type && (
+                <p><strong>Category:</strong> {viewJob.repair_type.replace('_', ' ').toUpperCase()}
+                  {viewJob.repair_subtype && ` (${viewJob.repair_subtype.replace('_', ' ').toUpperCase()})`}
+                </p>
+              )}
               <p><strong>Employee:</strong> {viewJob.employee_name || 'N/A'}</p>
               <p><strong>Notes:</strong> {viewJob.special_notes || 'None'}</p>
             </div>

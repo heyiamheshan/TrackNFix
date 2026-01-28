@@ -52,6 +52,11 @@ const SignUp = ({ onLogin }) => {
       return;
     }
 
+    if (!/^\d{10}$/.test(formData.telephone)) {
+      toast.error('Telephone number must be exactly 10 digits');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -68,14 +73,14 @@ const SignUp = ({ onLogin }) => {
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-container signup-container">
       <div className="glass-card auth-card">
         <div className="auth-header">
           <img src={logo} alt="Jayakody Auto Electricals Logo" className="auth-logo" />
           <h1 className="auth-title">Jayakody Auto Electricals</h1>
           <p className="auth-subtitle">Create Your Account</p>
         </div>
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit} className="auth-form signup-form">
           <div className="form-group">
             <label className="form-label">Full Name</label>
             <input
@@ -124,9 +129,7 @@ const SignUp = ({ onLogin }) => {
               <option value="admin">Admin</option>
               <option value="manager">Manager</option>
             </select>
-            <small className="form-hint">
-              Note: Only 2 admins and 2 managers can be registered
-            </small>
+
           </div>
           <div className="form-group">
             <label className="form-label">Password</label>

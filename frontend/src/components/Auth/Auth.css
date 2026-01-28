@@ -118,3 +118,28 @@
     font-size: 1.75rem;
   }
 }
+
+/* Horizontal Layout for Sign Up on Desktop */
+@media (min-width: 1024px) {
+  .signup-container .auth-card {
+    max-width: 800px;
+    /* Wider card for horizontal layout */
+    padding: 3rem;
+  }
+
+  .signup-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    /* Gap between columns */
+    align-items: start;
+  }
+
+  /* Make button and link span full width */
+  .signup-form .btn,
+  .signup-form .auth-link {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 2rem;
+  }
+}

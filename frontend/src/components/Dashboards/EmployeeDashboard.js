@@ -15,6 +15,8 @@ const EmployeeDashboard = ({ user, onLogout }) => {
   const [showVehicleSearch, setShowVehicleSearch] = useState(false);
   const [formData, setFormData] = useState({
     job_type: '',
+    repair_type: '',
+    repair_subtype: '',
     special_notes: '',
     initial_images: [],
     after_images: [],
@@ -77,7 +79,7 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.job_type) {
       toast.error('Please select a job type');
       return;
@@ -111,13 +113,19 @@ const EmployeeDashboard = ({ user, onLogout }) => {
 
       const formDataToSend = new FormData();
       formDataToSend.append('job_type', formData.job_type);
+      if (formData.job_type === 'repair') {
+        formDataToSend.append('repair_type', formData.repair_type);
+        if (formData.repair_type === 'electrical') {
+          formDataToSend.append('repair_subtype', formData.repair_subtype);
+        }
+      }
       formDataToSend.append('special_notes', formData.special_notes);
       formDataToSend.append('vehicle_id', vehicleId);
-      
+
       // Prepare image arrays with filenames
       const initialImageNames = formData.initial_images.map((_, idx) => `initial-${idx}`);
       const afterImageNames = formData.after_images.map((_, idx) => `after-${idx}`);
-      
+
       formDataToSend.append('initial_images', JSON.stringify(initialImageNames));
       formDataToSend.append('after_images', JSON.stringify(afterImageNames));
       formDataToSend.append('parts_replaced', JSON.stringify(formData.parts_replaced));
@@ -137,6 +145,8 @@ const EmployeeDashboard = ({ user, onLogout }) => {
       toast.success('Job submitted successfully!');
       setFormData({
         job_type: '',
+        repair_type: '',
+        repair_subtype: '',
         special_notes: '',
         initial_images: [],
         after_images: [],
@@ -282,6 +292,88 @@ const EmployeeDashboard = ({ user, onLogout }) => {
                 </div>
               </div>
             </div>
+
+            {formData.job_type === 'repair' && (
+              <div className="form-group" style={{ animation: 'fadeIn 0.5s ease' }}>
+                <label className="form-label">Repair Category *</label>
+                <div className="radio-group">
+                  <div className="radio-option">
+                    <input
+                      type="radio"
+                      id="mechanical"
+                      name="repair_type"
+                      value="mechanical"
+                      checked={formData.repair_type === 'mechanical'}
+                      onChange={(e) => setFormData({ ...formData, repair_type: e.target.value, repair_subtype: '' })}
+                    />
+                    <label htmlFor="mechanical">Mechanical</label>
+                  </div>
+                  <div className="radio-option">
+                    <input
+                      type="radio"
+                      id="electrical"
+                      name="repair_type"
+                      value="electrical"
+                      checked={formData.repair_type === 'electrical'}
+                      onChange={(e) => setFormData({ ...formData, repair_type: e.target.value, repair_subtype: '' })}
+                    />
+                    <label htmlFor="electrical">Electrical</label>
+                  </div>
+                  <div className="radio-option">
+                    <input
+                      type="radio"
+                      id="ac_repair"
+                      name="repair_type"
+                      value="ac_repair"
+                      checked={formData.repair_type === 'ac_repair'}
+                      onChange={(e) => setFormData({ ...formData, repair_type: e.target.value, repair_subtype: '' })}
+                    />
+                    <label htmlFor="ac_repair">AC Repair</label>
+                  </div>
+                </div>
+
+                {formData.repair_type === 'electrical' && (
+                  <div style={{ marginTop: '1rem', marginLeft: '1rem', paddingLeft: '1rem', borderLeft: '2px solid var(--accent-primary)', animation: 'slideIn 0.3s ease' }}>
+                    <label className="form-label">Electrical Sub-Category *</label>
+                    <div className="radio-group">
+                      <div className="radio-option">
+                        <input
+                          type="radio"
+                          id="normal_electrical"
+                          name="repair_subtype"
+                          value="normal_electrical"
+                          checked={formData.repair_subtype === 'normal_electrical'}
+                          onChange={(e) => setFormData({ ...formData, repair_subtype: e.target.value })}
+                        />
+                        <label htmlFor="normal_electrical">Normal Electrical</label>
+                      </div>
+                      <div className="radio-option">
+                        <input
+                          type="radio"
+                          id="hybrid_system"
+                          name="repair_subtype"
+                          value="hybrid_system"
+                          checked={formData.repair_subtype === 'hybrid_system'}
+                          onChange={(e) => setFormData({ ...formData, repair_subtype: e.target.value })}
+                        />
+                        <label htmlFor="hybrid_system">Hybrid System</label>
+                      </div>
+                      <div className="radio-option">
+                        <input
+                          type="radio"
+                          id="ev_system"
+                          name="repair_subtype"
+                          value="ev_system"
+                          checked={formData.repair_subtype === 'ev_system'}
+                          onChange={(e) => setFormData({ ...formData, repair_subtype: e.target.value })}
+                        />
+                        <label htmlFor="ev_system">EV System</label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label">Initial Images (All sides of vehicle) *</label>
