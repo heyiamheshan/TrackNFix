@@ -10,7 +10,7 @@ const router = express.Router();
 // @access  Private (Employee)
 router.post('/', protect, authorize('employee'), upload.array('images', 20), async (req, res) => {
   try {
-    const { job_type, special_notes, initial_images, after_images, parts_replaced, vehicle_id } = req.body;
+    const { job_type, special_notes, initial_images, after_images, parts_replaced, vehicle_id, repair_type, repair_subtype } = req.body;
 
     if (!job_type) {
       return res.status(400).json({ message: 'Job type is required' });
@@ -67,13 +67,15 @@ router.post('/', protect, authorize('employee'), upload.array('images', 20), asy
 
     // Create job
     const [result] = await pool.execute(
-      `INSERT INTO jobs (job_number, employee_id, vehicle_id, job_type, special_notes, initial_images, after_images, parts_replaced, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      `INSERT INTO jobs (job_number, employee_id, vehicle_id, job_type, repair_type, repair_subtype, special_notes, initial_images, after_images, parts_replaced, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         jobNumber,
         req.user.id,
         vehicle_id,
         job_type,
+        repair_type || null,
+        repair_subtype || null,
         special_notes || null,
         JSON.stringify(initialImagesArray),
         JSON.stringify(afterImagesArray),

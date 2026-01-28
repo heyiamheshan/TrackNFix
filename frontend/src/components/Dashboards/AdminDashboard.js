@@ -624,6 +624,11 @@ const AdminDashboard = ({ user, onLogout }) => {
                   <div key={job.id} className="glass-card" style={{ marginTop: '1rem' }}>
                     <p><strong>Job #{job.job_number}</strong></p>
                     <p>Type: {job.job_type.replace('_', ' ').toUpperCase()}</p>
+                    {job.job_type === 'repair' && job.repair_type && (
+                      <p>Category: {job.repair_type.replace('_', ' ').toUpperCase()}
+                        {job.repair_subtype && ` (${job.repair_subtype.replace('_', ' ').toUpperCase()})`}
+                      </p>
+                    )}
                     <p>Date: {new Date(job.created_at).toLocaleDateString()}</p>
                     {job.quotation_number && (
                       <p>Quotation: {job.quotation_number} - Total: Rs. {parseFloat(job.total_amount || 0).toFixed(2)}</p>
