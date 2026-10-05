@@ -8,7 +8,7 @@
 
 :root {
   /* Vehra / iOS 26 Liquid Glass Palette */
-  --bg-gradient-1: #0f2027;
+  --bg-gradient-1: #317d9e;
   --bg-gradient-2: #203a43;
   --bg-gradient-3: #2c5364;
 
@@ -36,7 +36,7 @@
 
   /* Glassmorphism Specs */
   --glass-blur: 20px;
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --glass-shadow: 0 8px 32px 0 rgba(167, 23, 23, 0.3);
   --glass-radius: 16px;
 }
 

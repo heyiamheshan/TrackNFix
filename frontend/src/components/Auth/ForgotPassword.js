@@ -55,7 +55,7 @@ const ForgotPassword = () => {
       toast.success('OTP verified. You can now reset your password.');
       setStep(3);
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Invalid or expired OTP.');
+      toast.error(error.response?.data?.message || 'sorry, Invalid or expired OTP.');
     } finally {
       setLoading(false);
     }
